@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Grasshopper Fire &amp; Rock Creek Irrigation District — Aerial Seeding Concept Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{--ink:#f4efe4;--panel:#132018ee;--gold:#e6b85c;--muted:#b9c6bc;--line:#415447}
+    *{box-sizing:border-box}html,body,#map{height:100%;margin:0}body{font:14px/1.35 system-ui,-apple-system,sans-serif;color:var(--ink);background:#0d1510}
+    #map{background:#17231b}.leaflet-control-attribution{font-size:10px}.leaflet-control-layers{display:none}
+    .mast{position:absolute;z-index:1000;top:14px;left:14px;max-width:min(570px,calc(100% - 28px));padding:14px 16px;border:1px solid #5e725f;border-radius:10px;background:var(--panel);box-shadow:0 4px 20px #0008}
+    h1{font-size:20px;line-height:1.12;margin:0 0 5px}.status{display:inline-block;padding:2px 7px;border-radius:999px;background:#9d2d24;font-weight:800;font-size:11px;letter-spacing:.06em}.sub{margin-top:7px;color:var(--muted);font-size:12px}
+    .base{display:flex;gap:5px;margin-top:10px}.base button{border:1px solid #637466;border-radius:5px;background:#243329;color:#e9eee9;padding:5px 9px;cursor:pointer}.base button.on{background:var(--gold);color:#182016;border-color:var(--gold);font-weight:700}
+    .panel{position:absolute;z-index:1000;top:14px;right:14px;width:320px;max-height:calc(100% - 28px);overflow:auto;padding:12px;border:1px solid #5e725f;border-radius:10px;background:var(--panel);box-shadow:0 4px 20px #0008}
+    .panel h2{font-size:14px;margin:2px 0 8px;color:var(--gold)}.group{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}.toggle{display:flex;gap:8px;align-items:flex-start;margin:6px 0}.toggle input{margin-top:3px}.toggle span{display:block;color:var(--muted);font-size:11px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}.stat{padding:7px;background:#1d2c22;border-radius:6px}.stat b{display:block;font-size:16px;color:#fff}.stat small{color:var(--muted)}
+    .warning{padding:8px;margin-top:9px;border-left:3px solid var(--gold);background:#2e2d1d;color:#f2e3bf;font-size:11px}.legend{font-size:11px;color:var(--muted)}.sw{display:inline-block;width:12px;height:9px;margin-right:5px;border:1px solid #fff4;vertical-align:middle}
+    .zone-label{background:#132018dd;border:1px solid #c7d3c8;color:#fff;box-shadow:none;font-weight:700}.zone-label:before{display:none}
+    @media(max-width:800px){.panel{top:auto;bottom:12px;left:12px;right:12px;width:auto;max-height:45%}.mast{right:12px}.mast .sub{display:none}}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <section class="mast">
+    <h1>Grasshopper Fire &amp; Rock Creek Irrigation District</h1>
+    <span class="status">DRAFT AERIAL SEEDING CONCEPT</span>
+    <div class="sub">Current WFIGS perimeter · existing LiDAR · Sentinel‑2 dNBR · terrain-only routing. Planning estimate, not an executable DJI mission.</div>
+    <div class="base"><button data-base="sat" class="on">Satellite</button><button data-base="topo">Topo</button><button data-base="street">Street</button></div>
+  </section>
+  <aside class="panel">
+    <h2>Flight-Time First Look</h2>
+    <div class="stats" id="stats"></div>
+    <div class="warning">Seed release is modeled only inside <b>Burned Watershed ∩ Rock Zone</b>. Ferry legs may leave it. Trees, wires, access, airspace, wind, battery logs, granular calibration, and regulations are deliberately not cleared in this draft.</div>
+    <div class="group"><h2>Application Plan</h2><div id="flightLayers"></div></div>
+    <div class="group"><h2>Terrain &amp; Fire</h2><div id="terrainLayers"></div></div>
+    <div class="group"><h2>Water &amp; Reference</h2><div id="referenceLayers"></div></div>
+    <div class="group legend"><b>Provisional satellite dNBR</b><br><span class="sw" style="background:#bdbdbd"></span>&lt;0.10 unburned/regrowth<br><span class="sw" style="background:#ffffb2"></span>0.10–0.27 low<br><span class="sw" style="background:#fecc5c"></span>0.27–0.44 moderate-low<br><span class="sw" style="background:#fd8d3c"></span>0.44–0.66 moderate-high<br><span class="sw" style="background:#e31a1c"></span>≥0.66 high</div>
+  </aside>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="assets/map-data.js"></script>
+  <script src="assets/slope-tile-index.js"></script>
+  <script>
+    const D=window.RCDIC_SEEDING_MAP, canvas=L.canvas({padding:.4});
+    const map=L.map('map',{center:[45.255,-121.47],zoom:12,zoomControl:false,preferCanvas:true});L.control.zoom({position:'bottomleft'}).addTo(map);
+    const bases={sat:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri, Maxar, USDA'}),topo:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'}),street:L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'})};bases.sat.addTo(map);
+    document.querySelectorAll('[data-base]').forEach(b=>b.onclick=()=>{Object.values(bases).forEach(x=>map.removeLayer(x));bases[b.dataset.base].addTo(map);document.querySelectorAll('[data-base]').forEach(x=>x.classList.toggle('on',x===b));});
+    const zoneStyle=f=>({renderer:canvas,color:f.properties.color,weight:1,fillColor:f.properties.color,fillOpacity:.28});
+    const zones=L.geoJSON(D.zones,{style:zoneStyle,onEachFeature:(f,l)=>l.bindPopup(`<b>${f.properties.name}</b><br>${f.properties.selected_planning_acres.toLocaleString()} planning acres<br>${f.properties.aerial_pls_lb_ac} lb PLS/ac aerial-compatible mix<br>${f.properties.total_pls_lb.toLocaleString()} lb PLS total`).bindTooltip(f.properties.zone,{sticky:true,className:'zone-label'})});
+    const routeColors={Z1:'#41b6c4',Z2:'#2c7fb8',Z3:'#7fcdbb',Z5:'#fdae61',Z6:'#d73027',Z7:'#756bb1'};
+    const routes=L.geoJSON(D.routes,{renderer:canvas,style:f=>({color:routeColors[f.properties.zone],weight:1,opacity:.68}),onEachFeature:(f,l)=>l.bindPopup(`<b>${f.properties.zone} application tracks</b><br>${f.properties.segment_count.toLocaleString()} segments · ${f.properties.swath_m} m base swath<br>Release ON · includes section-controlled edge passes`)});
+    const ferries=L.geoJSON(D.ferries,{renderer:canvas,style:{color:'#f7f7f7',weight:.7,opacity:.35,dashArray:'3 4'},onEachFeature:(f,l)=>l.bindPopup(`<b>${f.properties.zone} ferry links</b><br>Conceptual · release OFF`)});
+    const staging=L.geoJSON(D.staging,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#111',fillOpacity:.9}),onEachFeature:(f,l)=>l.bindPopup(`<b>${f.properties.site_id}</b><br>Mathematically efficient draft staging/refill point.<br>Road access and site suitability not verified.`)});
+    const slopeKeys=new Set(window.RCDIC_SLOPE_TILE_KEYS), blankTile='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    const IndexedTileLayer=L.TileLayer.extend({getTileUrl(c){const key=`${c.z}/${c.x}/${c.y}`;return slopeKeys.has(key)?`assets/RCDIC_Native_Slope_2026-08-17_v1/${key}.webp`:blankTile;}});
+    const slope=new IndexedTileLayer('',{opacity:.7,minZoom:11,maxNativeZoom:17,maxZoom:19,bounds:[[45.201618,-121.583157],[45.342417,-121.325343]],attribution:'DOGAMI LiDAR'});
+    const e=D.terrain_exposure_bounds, exposure=L.imageOverlay('assets/RCDIC_Current_Terrain_Exposure_2026-08-17_v1.png',[[e[1],e[0]],[e[3],e[2]]],{opacity:.68});
+    const b=D.dnbr.bounds_wgs84, dnbr=L.imageOverlay('assets/Grasshopper_RockZone_Provisional_dNBR_2026-08-18_v1.png',[[b[1],b[0]],[b[3],b[2]]],{opacity:.72});
+    const contours=L.geoJSON(D.contours,{renderer:canvas,style:f=>({color:f.properties.index_1000ft?'#3b220c':'#76522d',weight:f.properties.index_1000ft?1.5:.55,opacity:f.properties.index_1000ft?.9:.52}),onEachFeature:(f,l)=>{if(f.properties.index_1000ft)l.bindTooltip(`${f.properties.elevation_ft.toLocaleString()} ft`,{sticky:true});}});
+    const badger=L.geoJSON(D.badger_channels,{renderer:canvas,style:{color:'#3db7d3',weight:1.1,opacity:.9}}), rock=L.geoJSON(D.rock_channels,{renderer:canvas,style:{color:'#006fb9',weight:1.1,opacity:.9}});
+    const overlap=L.geoJSON(D.rock_burn_overlap,{renderer:canvas,style:{color:'#ffeb3b',weight:2.2,dashArray:'7 5',fill:false}}), burned=L.geoJSON(D.burned_watershed,{renderer:canvas,style:{color:'#ff5438',weight:1.4,fill:false,opacity:.8}});
+    const layerSets={
+      flight:[['Aerial planting zones',zones,true],['Base 8 m application tracks',routes,false],['Non-dispensing ferry links',ferries,false],['Draft staging/refill points',staging,true]],
+      terrain:[['Slope Gradients: <3%, 3–8%, 8–15%, 15–30%, 30–60%, >60%',slope,false],['Elevation Contours 100/1000 ft',contours,false],['Terrain Exposure – Burned Watershed',exposure,true],['Provisional Satellite Burn Severity (dNBR)',dnbr,false]],
+      reference:[['Water Network, Badger Creek (Ten Acre Channel Network)',badger,false],['Water Network, Rock Creek Reservoir (Ten Acre Channel Network)',rock,true],['Burned Watershed ∩ Rock Zone',overlap,true],['Current Burned Watershed',burned,false]]};
+    function mount(id,items){const el=document.getElementById(id);items.forEach(([name,layer,on],i)=>{const label=document.createElement('label');label.className='toggle';label.innerHTML=`<input type="checkbox" ${on?'checked':''}><div>${name}</div>`;const input=label.querySelector('input');input.onchange=()=>input.checked?layer.addTo(map):map.removeLayer(layer);el.appendChild(label);if(on)layer.addTo(map);});}
+    mount('flightLayers',layerSets.flight);mount('terrainLayers',layerSets.terrain);mount('referenceLayers',layerSets.reference);
+    const totals=Object.values(D.route_stats), acres=totals.reduce((s,x)=>s+x.selected_planning_acres,0), pls=totals.reduce((s,x)=>s+x.total_pls_lb,0), base=D.timing.base.totals;
+    document.getElementById('stats').innerHTML=`<div class="stat"><b>${acres.toLocaleString(undefined,{maximumFractionDigits:0})}</b><small>selected planning acres</small></div><div class="stat"><b>${pls.toLocaleString(undefined,{maximumFractionDigits:0})}</b><small>lb PLS (bulk pending tags)</small></div><div class="stat"><b>${base.productive_application_hours.toLocaleString()} h</b><small>base productive track time</small></div><div class="stat"><b>${base.total_flight_hours.toLocaleString()} h</b><small>base total flight time</small></div>`;
+    map.fitBounds(overlap.getBounds(),{padding:[30,30]});
+  </script>
+</body>
+</html>
