@@ -8,6 +8,8 @@ This is not an executable drone mission. It does not clear obstacles, access, ai
 
 Open `index.html` through a web server. The public deployment uses GitHub Pages.
 
+**Public map:** https://wrrcattle.github.io/wrr-grasshopper-rock-creek-seeding-map/
+
 ## Headline Estimate
 
 - Selected planning footprint: 5,581.97 acres
